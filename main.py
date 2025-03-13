@@ -291,7 +291,7 @@ async def admin_rp(interaction: discord.Interaction, user: discord.Member, amoun
     )
     await interaction.response.send_message(embed=embed)
 
-@bot.tree.command(name="Ping", description="Tests the bot's response time")
+@bot.tree.command(name="ping", description="Tests the bot's response time")
 async def ping(interaction: discord.Interaction):
     embed = discord.Embed(
         title="Pong!",
