@@ -291,7 +291,14 @@ async def admin_rp(interaction: discord.Interaction, user: discord.Member, amoun
     )
     await interaction.response.send_message(embed=embed)
 
-
+@bot.tree.command(name="Ping", description="Tests the bot's response time")
+async def ping(interaction: discord.Interaction):
+    embed = discord.Embed(
+        title="Pong!",
+        description=f"Latency: {round(bot.latency * 1000)}ms",
+        color=discord.Color.green()
+    )
+    await interaction.response.send_message(embed=embed)
 
 
 # Read the token from a file named "token".
