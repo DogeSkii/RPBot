@@ -179,6 +179,33 @@ async def simulate_weekly_wipe(interaction: discord.Interaction):
     )
     await interaction.response.send_message(embed=embed)
 
+@bot.tree.command(name="revoke-historical-rp", description="Revoke RP from your historical total.")
+async def revoke_historical_rp(interaction: discord.Interaction, amount: int):
+    user_id = str(interaction.user.id)
+    async with db.execute("SELECT historical_rp FROM rp_data WHERE user_id = ?", (user_id,)) as cursor:
+        row = await cursor.fetchone()
+    
+    if row is None:
+        embed = discord.Embed(
+            title="No Historical RP Found",
+            description="You don't have any historical RP to revoke.",
+            color=discord.Color.red()
+        )
+        return await interaction.response.send_message(embed=embed)
+    
+    new_total = max(row[0] - amount, 0)
+    await db.execute("UPDATE rp_data SET historical_rp = ? WHERE user_id = ?", (new_total, user_id))
+    await db.commit()
+    
+    embed = discord.Embed(
+        title="Historical RP Revoked",
+        description=f"Revoked **{amount} RP** from your historical RP total.\nYour new total is **{new_total} RP**.",
+        color=discord.Color.orange()
+    )
+    await interaction.response.send_message(embed=embed)
+
+
+
 # Read the token from a file named "token".
 with open("token", "r") as token_file:
     TOKEN = token_file.read().strip()
