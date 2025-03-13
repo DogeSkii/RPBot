@@ -301,6 +301,35 @@ async def ping(interaction: discord.Interaction):
     await interaction.response.send_message(embed=embed)
 
 
+# add eval command for db
+@bot.tree.command(name="eval-sql", description="Execute raw SQL commands. (Whitelisted users only)")
+async def eval_sql(interaction: discord.Interaction, query: str):
+    if interaction.user.id not in WHITELISTED_USERS:
+        embed = discord.Embed(
+            title="Access Denied",
+            description="You are not authorized to perform this action.",
+            color=discord.Color.red()
+        )
+        return await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    try:
+        async with db.execute(query) as cursor:
+            if query.strip().lower().startswith("select"):
+                rows = await cursor.fetchall()
+                result = "\n".join(str(row) for row in rows)
+            else:
+                await db.commit()
+                result = "Query executed successfully."
+    except Exception as e:
+        result = f"An error occurred: {e}"
+
+    embed = discord.Embed(
+        title="SQL Query Result",
+        description=f"```{result}```",
+        color=discord.Color.blue()
+    )
+    await interaction.response.send_message(embed=embed, ephemeral=True)
+
 # Read the token from a file named "token".
 with open("token", "r") as token_file:
     TOKEN = token_file.read().strip()
