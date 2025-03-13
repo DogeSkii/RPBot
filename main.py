@@ -11,6 +11,11 @@ bot = commands.Bot(command_prefix=".", intents=intents)
 DATABASE = "rp_database.db"
 db = None
 
+start_time = datetime.datetime.utcnow()
+
+WHITELISTED_USERS = {1118843189323898910,1037103122251780207}  # Replace with actual Discord user IDs
+
+
 async def initialize_database():
     global db
     db = await aiosqlite.connect(DATABASE)
@@ -169,13 +174,23 @@ async def historical_rp(interaction: discord.Interaction):
     )
     await interaction.response.send_message(embed=embed)
 
-@bot.tree.command(name="simulate-weekly-wipe", description="Simulate a weekly wipe immediately.")
+@bot.tree.command(name="simulate-weekly-wipe", description="Manually trigger the weekly RP reset. (Whitelisted users only)")
 async def simulate_weekly_wipe(interaction: discord.Interaction):
-    await weekly_reset()
+    if interaction.user.id not in WHITELISTED_USERS:
+        embed = discord.Embed(
+            title="Access Denied",
+            description="You are not authorized to perform this action.",
+            color=discord.Color.red()
+        )
+        return await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    async with db.execute("UPDATE rp_data SET historical_rp = historical_rp + weekly_rp, weekly_rp = 0") as cursor:
+        await db.commit()
+
     embed = discord.Embed(
-        title="Weekly Wipe Simulated",
-        description="Weekly RP has been wiped and moved to historical RP.",
-        color=discord.Color.red()
+        title="Weekly RP Reset Completed",
+        description="All weekly RP has been moved to historical RP, and the leaderboard has been reset.",
+        color=discord.Color.green()
     )
     await interaction.response.send_message(embed=embed)
 
@@ -203,6 +218,31 @@ async def revoke_historical_rp(interaction: discord.Interaction, amount: int):
         color=discord.Color.orange()
     )
     await interaction.response.send_message(embed=embed)
+
+
+@bot.tree.command(name="time-to-next-reset", description="Shows the time remaining until the next weekly RP reset.")
+async def time_to_next_reset(interaction: discord.Interaction):
+    seconds_remaining = seconds_until_next_monday_midnight_utc()
+    time_remaining = datetime.timedelta(seconds=int(seconds_remaining))
+
+    embed = discord.Embed(
+        title="Time Until Next Weekly Reset",
+        description=f"The next RP reset will occur in **{time_remaining}**.",
+        color=discord.Color.blue()
+    )
+    await interaction.response.send_message(embed=embed)
+
+@bot.tree.command(name="uptime", description="Shows how long the bot has been running.")
+async def uptime(interaction: discord.Interaction):
+    uptime_duration = datetime.datetime.utcnow() - start_time
+
+    embed = discord.Embed(
+        title="Bot Uptime",
+        description=f"The bot has been running for **{str(uptime_duration).split('.')[0]}**.",
+        color=discord.Color.green()
+    )
+    await interaction.response.send_message(embed=embed)
+
 
 
 
