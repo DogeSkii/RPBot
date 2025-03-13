@@ -3,7 +3,7 @@ from discord.ext import commands
 import aiosqlite
 import asyncio
 import datetime
-
+from discord import app_commands
 # Use all intents
 intents = discord.Intents.all()
 bot = commands.Bot(command_prefix=".", intents=intents)
@@ -240,6 +240,54 @@ async def uptime(interaction: discord.Interaction):
         title="Bot Uptime",
         description=f"The bot has been running for **{str(uptime_duration).split('.')[0]}**.",
         color=discord.Color.green()
+    )
+    await interaction.response.send_message(embed=embed)
+
+
+@bot.tree.command(name="admin-rp", description="Modify another user's RP. (Whitelisted users only)")
+@app_commands.describe(user="The user to modify.", amount="Amount of RP.", action="Add, remove, or set RP.")
+@app_commands.choices(action=[
+    discord.app_commands.Choice(name="Add", value="add"),
+    discord.app_commands.Choice(name="Remove", value="remove"),
+    discord.app_commands.Choice(name="Set", value="set")
+])
+async def admin_rp(interaction: discord.Interaction, user: discord.Member, amount: int, action: str):
+    if interaction.user.id not in WHITELISTED_USERS:
+        embed = discord.Embed(
+            title="Access Denied",
+            description="You are not authorized to use this command.",
+            color=discord.Color.red()
+        )
+        return await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    user_id = str(user.id)
+
+    # Fetch the current RP
+    async with db.execute("SELECT weekly_rp FROM rp_data WHERE user_id = ?", (user_id,)) as cursor:
+        row = await cursor.fetchone()
+    
+    current_rp = row[0] if row else 0
+
+    # Perform the action
+    if action == "add":
+        new_rp = current_rp + amount
+    elif action == "remove":
+        new_rp = max(current_rp - amount, 0)  # Ensure RP doesn't go negative
+    elif action == "set":
+        new_rp = max(amount, 0)  # Ensure RP isn't negative
+    else:
+        return await interaction.response.send_message("Invalid action.", ephemeral=True)
+
+    # Update the database
+    await db.execute("INSERT INTO rp_data (user_id, weekly_rp) VALUES (?, ?) ON CONFLICT(user_id) DO UPDATE SET weekly_rp = ?", 
+                     (user_id, new_rp, new_rp))
+    await db.commit()
+
+    # Send a confirmation embed
+    embed = discord.Embed(
+        title="RP Modified",
+        description=f"**{user.display_name}**'s weekly RP has been updated:\n**New RP Total:** {new_rp}",
+        color=discord.Color.orange()
     )
     await interaction.response.send_message(embed=embed)
 
