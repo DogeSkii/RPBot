@@ -328,7 +328,7 @@ async def eval_sql(interaction: discord.Interaction, query: str):
         description=f"```{result}```",
         color=discord.Color.blue()
     )
-    await interaction.response.send_message(embed=embed, ephemeral=True)
+    await interaction.response.send_message(embed=embed)
 
 # Read the token from a file named "token".
 with open("token", "r") as token_file:
