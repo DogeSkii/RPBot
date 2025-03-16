@@ -39,8 +39,41 @@ async def initialize_database():
         await db.execute("ALTER TABLE rp_data ADD COLUMN historical_rp INTEGER DEFAULT 0")
     await db.commit()
 
+
+
+async def send_final_leaderboard():
+    channel_id = 123456789012345678  # Replace with your channel ID
+    channel = bot.get_channel(channel_id)
+    
+    if channel is None:
+        print(f"Channel with ID {channel_id} not found.")
+        return
+
+    async with db.execute("SELECT user_id, weekly_rp FROM rp_data WHERE weekly_rp > 0 ORDER BY weekly_rp DESC LIMIT 10") as cursor:
+        rows = await cursor.fetchall()
+    
+    if not rows:
+        description = "No RP records found."
+    else:
+        description = ""
+        for position, (user_id, rp_amount) in enumerate(rows, start=1):
+            member = bot.get_user(int(user_id))
+            name = member.name if member else f"User {user_id}"
+            description += f"**{position}. {name}** — **{rp_amount} RP**\n"
+    
+    embed = discord.Embed(
+        title="Final Weekly RP Leaderboard",
+        description=description,
+        color=discord.Color.purple()
+    )
+    await channel.send(embed=embed)
+
+
+
+
 async def weekly_reset():
     # Move weekly RP to historical RP and reset weekly_rp for all users.
+    await send_final_leaderboard()
     await db.execute("""
         UPDATE rp_data
         SET historical_rp = historical_rp + weekly_rp,
@@ -330,42 +363,6 @@ async def eval_sql(interaction: discord.Interaction, query: str):
     )
     await interaction.response.send_message(embed=embed)
 
-    async def send_final_leaderboard():
-        channel_id = 1327368402855268402  # Replace with your channel ID
-        channel = bot.get_channel(channel_id)
-        
-        if channel is None:
-            print(f"Channel with ID {channel_id} not found.")
-            return
-
-        async with db.execute("SELECT user_id, weekly_rp FROM rp_data WHERE weekly_rp > 0 ORDER BY weekly_rp DESC LIMIT 10") as cursor:
-            rows = await cursor.fetchall()
-        
-        if not rows:
-            description = "No RP records found."
-        else:
-            description = ""
-            for position, (user_id, rp_amount) in enumerate(rows, start=1):
-                member = bot.get_user(int(user_id))
-                name = member.name if member else f"User {user_id}"
-                description += f"**{position}. {name}** — **{rp_amount} RP**\n"
-        
-        embed = discord.Embed(
-            title="Final Weekly RP Leaderboard",
-            description=description,
-            color=discord.Color.purple()
-        )
-        await channel.send(embed=embed)
-
-    async def weekly_reset():
-        await send_final_leaderboard()
-        await db.execute("""
-            UPDATE rp_data
-            SET historical_rp = historical_rp + weekly_rp,
-                weekly_rp = 0
-        """)
-        await db.commit()
-        print("Weekly RP reset completed.")
 
 # Read the token from a file named "token".
 with open("token", "r") as token_file:
