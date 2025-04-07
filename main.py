@@ -186,6 +186,34 @@ async def leaderboard(interaction: discord.Interaction):
     )
     await interaction.response.send_message(embed=embed)
 
+@bot.tree.command(name="historical-leaderboard", description="Show the historical RP leaderboard.")
+async def leaderboard(interaction: discord.Interaction):
+    # Exclude users with 0 weekly RP.
+    async with db.execute("SELECT user_id, historical_rp FROM rp_data WHERE historical_rp > 0 ORDER BY historical_rp DESC LIMIT 10") as cursor:
+        rows = await cursor.fetchall()
+    
+    if not rows:
+        embed = discord.Embed(
+            title="Historical Leaderboard",
+            description="No RP records found.",
+            color=discord.Color.blue()
+        )
+        return await interaction.response.send_message(embed=embed)
+    
+    description = ""
+    for position, (user_id, rp_amount) in enumerate(rows, start=1):
+        member = bot.get_user(int(user_id))
+        name = member.name if member else f"User {user_id}"
+        description += f"**{position}. {name}** — **{rp_amount} RP**\n"
+    
+    embed = discord.Embed(
+        title="Historical RP Leaderboard",
+        description=description,
+        color=discord.Color.purple()
+    )
+    await interaction.response.send_message(embed=embed)
+
+
 @bot.tree.command(name="historical-rp", description="Show your historical RP total.")
 async def historical_rp(interaction: discord.Interaction):
     user_id = str(interaction.user.id)
