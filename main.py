@@ -6,7 +6,7 @@ import datetime
 from discord import app_commands
 # Use all intents
 intents = discord.Intents.all()
-bot = commands.Bot(command_prefix=".", intents=intents)
+bot = commands.Bot(command_prefix="(0000)", intents=intents)
 
 DATABASE = "rp_database.db"
 db = None
