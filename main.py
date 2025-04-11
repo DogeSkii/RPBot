@@ -6,6 +6,7 @@ import datetime
 from discord import app_commands
 import traceback
 import requests
+from typing import Callable, Any, Coroutine
 
 # Webhook URL for logging
 #read webhook from a file called webhook with no extention
@@ -21,8 +22,8 @@ def log_to_webhook(message: str):
         print(f"Failed to send log to webhook: {e}")
 
 # Log function calls
-def log_function_call(func):
-    async def wrapper(*args, **kwargs):
+def log_function_call(func: Callable[..., Coroutine[Any, Any, Any]]) -> Callable[..., Coroutine[Any, Any, Any]]:
+    async def wrapper(*args: Any, **kwargs: Any) -> Any:
         log_to_webhook(f"Function `{func.__name__}` called with args: {args}, kwargs: {kwargs}")
         return await func(*args, **kwargs)
     return wrapper
