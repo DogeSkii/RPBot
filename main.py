@@ -22,11 +22,8 @@ def log_to_webhook(message: str):
         print(f"Failed to send log to webhook: {e}")
 
 # Log function calls
-def log_function_call(func: Callable[..., Coroutine[Any, Any, Any]]) -> Callable[..., Coroutine[Any, Any, Any]]:
-    async def wrapper(*args: Any, **kwargs: Any) -> Any:
-        log_to_webhook(f"Function `{func.__name__}` called with args: {args}, kwargs: {kwargs}")
-        return await func(*args, **kwargs)
-    return wrapper
+def log_function_call(func_name: str, *args, **kwargs):
+    log_to_webhook(f"Function `{func_name}` called with args: {args}, kwargs: {kwargs}")
 
 # Use all intents
 intents = discord.Intents.all()
@@ -138,8 +135,8 @@ async def on_ready():
     bot.loop.create_task(weekly_reset_task())
 
 @bot.tree.command(name="rp", description="Add RP to your account.")
-@log_function_call
 async def rp(interaction: discord.Interaction, amount: int):
+    log_function_call("rp", interaction=interaction, amount=amount)
     user_id = str(interaction.user.id)
     async with db.execute("SELECT weekly_rp FROM rp_data WHERE user_id = ?", (user_id,)) as cursor:
         row = await cursor.fetchone()
@@ -160,8 +157,8 @@ async def rp(interaction: discord.Interaction, amount: int):
     await interaction.response.send_message(embed=embed)
 
 @bot.tree.command(name="revoke-rp", description="Revoke RP from your account.")
-@log_function_call
 async def revoke_rp(interaction: discord.Interaction, amount: int):
+    log_function_call("revoke_rp", interaction=interaction, amount=amount)
     user_id = str(interaction.user.id)
     async with db.execute("SELECT weekly_rp FROM rp_data WHERE user_id = ?", (user_id,)) as cursor:
         row = await cursor.fetchone()
@@ -186,8 +183,8 @@ async def revoke_rp(interaction: discord.Interaction, amount: int):
     await interaction.response.send_message(embed=embed)
 
 @bot.tree.command(name="leaderboard", description="Show the weekly RP leaderboard.")
-@log_function_call
 async def leaderboard(interaction: discord.Interaction):
+    log_function_call("leaderboard", interaction=interaction)
     # Exclude users with 0 weekly RP.
     async with db.execute("SELECT user_id, weekly_rp FROM rp_data WHERE weekly_rp > 0 ORDER BY weekly_rp DESC LIMIT 10") as cursor:
         rows = await cursor.fetchall()
@@ -214,8 +211,8 @@ async def leaderboard(interaction: discord.Interaction):
     await interaction.response.send_message(embed=embed)
 
 @bot.tree.command(name="historical-leaderboard", description="Show the historical RP leaderboard.")
-@log_function_call
 async def leaderboard(interaction: discord.Interaction):
+    log_function_call("historical_leaderboard", interaction=interaction)
     # Exclude users with 0 weekly RP.
     async with db.execute("SELECT user_id, historical_rp FROM rp_data WHERE historical_rp > 0 ORDER BY historical_rp DESC LIMIT 10") as cursor:
         rows = await cursor.fetchall()
@@ -244,6 +241,7 @@ async def leaderboard(interaction: discord.Interaction):
 
 @bot.tree.command(name="historical-rp", description="Show your historical RP total.")
 async def historical_rp(interaction: discord.Interaction):
+    log_function_call("historical_rp", interaction=interaction)
     user_id = str(interaction.user.id)
     async with db.execute("SELECT historical_rp, weekly_rp FROM rp_data WHERE user_id = ?", (user_id,)) as cursor:
         row = await cursor.fetchone()
@@ -264,8 +262,8 @@ async def historical_rp(interaction: discord.Interaction):
     await interaction.response.send_message(embed=embed)
 
 @bot.tree.command(name="simulate-weekly-wipe", description="Manually trigger the weekly RP reset. (Whitelisted users only)")
-@log_function_call
 async def simulate_weekly_wipe(interaction: discord.Interaction):
+    log_function_call("simulate_weekly_wipe", interaction=interaction)
     if interaction.user.id not in WHITELISTED_USERS:
         embed = discord.Embed(
             title="Access Denied",
@@ -285,8 +283,8 @@ async def simulate_weekly_wipe(interaction: discord.Interaction):
     await interaction.response.send_message(embed=embed)
 
 @bot.tree.command(name="revoke-historical-rp", description="Revoke RP from your historical total.")
-@log_function_call
 async def revoke_historical_rp(interaction: discord.Interaction, amount: int):
+    log_function_call("revoke_historical_rp", interaction=interaction, amount=amount)
     user_id = str(interaction.user.id)
     async with db.execute("SELECT historical_rp FROM rp_data WHERE user_id = ?", (user_id,)) as cursor:
         row = await cursor.fetchone()
@@ -312,8 +310,8 @@ async def revoke_historical_rp(interaction: discord.Interaction, amount: int):
 
 
 @bot.tree.command(name="time-to-next-reset", description="Shows the time remaining until the next weekly RP reset.")
-@log_function_call
 async def time_to_next_reset(interaction: discord.Interaction):
+    log_function_call("time_to_next_reset", interaction=interaction)
     seconds_remaining = seconds_until_next_monday_midnight_utc()
     time_remaining = datetime.timedelta(seconds=int(seconds_remaining))
 
@@ -325,8 +323,8 @@ async def time_to_next_reset(interaction: discord.Interaction):
     await interaction.response.send_message(embed=embed)
 
 @bot.tree.command(name="uptime", description="Shows how long the bot has been running.")
-@log_function_call
 async def uptime(interaction: discord.Interaction):
+    log_function_call("uptime", interaction=interaction)
     uptime_duration = datetime.datetime.utcnow() - start_time
 
     embed = discord.Embed(
@@ -344,8 +342,8 @@ async def uptime(interaction: discord.Interaction):
     discord.app_commands.Choice(name="Remove", value="remove"),
     discord.app_commands.Choice(name="Set", value="set")
 ])
-@log_function_call
 async def admin_rp(interaction: discord.Interaction, user: discord.Member, amount: int, action: str):
+    log_function_call("admin_rp", interaction=interaction, user=user, amount=amount, action=action)
     if interaction.user.id not in WHITELISTED_USERS:
         embed = discord.Embed(
             title="Access Denied",
@@ -386,8 +384,8 @@ async def admin_rp(interaction: discord.Interaction, user: discord.Member, amoun
     await interaction.response.send_message(embed=embed)
 
 @bot.tree.command(name="ping", description="Tests the bot's response time")
-@log_function_call
 async def ping(interaction: discord.Interaction):
+    log_function_call("ping", interaction=interaction)
     embed = discord.Embed(
         title="Pong!",
         description=f"Latency: {round(bot.latency * 1000)}ms",
@@ -398,8 +396,8 @@ async def ping(interaction: discord.Interaction):
 
 # add eval command for db
 @bot.tree.command(name="eval-sql", description="Execute raw SQL commands. (Whitelisted users only)")
-@log_function_call
 async def eval_sql(interaction: discord.Interaction, query: str):
+    log_function_call("eval_sql", interaction=interaction, query=query)
     if interaction.user.id not in WHITELISTED_USERS:
         embed = discord.Embed(
             title="Access Denied",
