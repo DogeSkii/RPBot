@@ -2,3 +2,5 @@ asyncio
 discord
 aiosqlite
 datetime
+requests
+traceback

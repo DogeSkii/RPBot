@@ -4,6 +4,29 @@ import aiosqlite
 import asyncio
 import datetime
 from discord import app_commands
+import traceback
+import requests
+
+# Webhook URL for logging
+#read webhook from a file called webhook with no extention
+with open("webhook", "r") as webhook_file:
+    WEBHOOK_URL = webhook_file.read().strip()
+
+
+# Function to send logs to the webhook
+def log_to_webhook(message: str):
+    try:
+        requests.post(WEBHOOK_URL, json={"content": message})
+    except Exception as e:
+        print(f"Failed to send log to webhook: {e}")
+
+# Log function calls
+def log_function_call(func):
+    async def wrapper(*args, **kwargs):
+        log_to_webhook(f"Function `{func.__name__}` called with args: {args}, kwargs: {kwargs}")
+        return await func(*args, **kwargs)
+    return wrapper
+
 # Use all intents
 intents = discord.Intents.all()
 bot = commands.Bot(command_prefix="(0000)", intents=intents)
@@ -104,7 +127,7 @@ async def weekly_reset_task():
 @bot.event
 async def on_ready():
     await initialize_database()
-    print(f"Logged in as {bot.user} (ID: {bot.user.id})")
+    log_to_webhook(f"Bot is ready. Logged in as {bot.user} (ID: {bot.user.id})")
     try:
         synced = await bot.tree.sync()
         print(f"Synced {len(synced)} slash command(s).")
@@ -114,6 +137,7 @@ async def on_ready():
     bot.loop.create_task(weekly_reset_task())
 
 @bot.tree.command(name="rp", description="Add RP to your account.")
+@log_function_call
 async def rp(interaction: discord.Interaction, amount: int):
     user_id = str(interaction.user.id)
     async with db.execute("SELECT weekly_rp FROM rp_data WHERE user_id = ?", (user_id,)) as cursor:
@@ -135,6 +159,7 @@ async def rp(interaction: discord.Interaction, amount: int):
     await interaction.response.send_message(embed=embed)
 
 @bot.tree.command(name="revoke-rp", description="Revoke RP from your account.")
+@log_function_call
 async def revoke_rp(interaction: discord.Interaction, amount: int):
     user_id = str(interaction.user.id)
     async with db.execute("SELECT weekly_rp FROM rp_data WHERE user_id = ?", (user_id,)) as cursor:
@@ -160,6 +185,7 @@ async def revoke_rp(interaction: discord.Interaction, amount: int):
     await interaction.response.send_message(embed=embed)
 
 @bot.tree.command(name="leaderboard", description="Show the weekly RP leaderboard.")
+@log_function_call
 async def leaderboard(interaction: discord.Interaction):
     # Exclude users with 0 weekly RP.
     async with db.execute("SELECT user_id, weekly_rp FROM rp_data WHERE weekly_rp > 0 ORDER BY weekly_rp DESC LIMIT 10") as cursor:
@@ -187,6 +213,7 @@ async def leaderboard(interaction: discord.Interaction):
     await interaction.response.send_message(embed=embed)
 
 @bot.tree.command(name="historical-leaderboard", description="Show the historical RP leaderboard.")
+@log_function_call
 async def leaderboard(interaction: discord.Interaction):
     # Exclude users with 0 weekly RP.
     async with db.execute("SELECT user_id, historical_rp FROM rp_data WHERE historical_rp > 0 ORDER BY historical_rp DESC LIMIT 10") as cursor:
@@ -236,6 +263,7 @@ async def historical_rp(interaction: discord.Interaction):
     await interaction.response.send_message(embed=embed)
 
 @bot.tree.command(name="simulate-weekly-wipe", description="Manually trigger the weekly RP reset. (Whitelisted users only)")
+@log_function_call
 async def simulate_weekly_wipe(interaction: discord.Interaction):
     if interaction.user.id not in WHITELISTED_USERS:
         embed = discord.Embed(
@@ -256,6 +284,7 @@ async def simulate_weekly_wipe(interaction: discord.Interaction):
     await interaction.response.send_message(embed=embed)
 
 @bot.tree.command(name="revoke-historical-rp", description="Revoke RP from your historical total.")
+@log_function_call
 async def revoke_historical_rp(interaction: discord.Interaction, amount: int):
     user_id = str(interaction.user.id)
     async with db.execute("SELECT historical_rp FROM rp_data WHERE user_id = ?", (user_id,)) as cursor:
@@ -282,6 +311,7 @@ async def revoke_historical_rp(interaction: discord.Interaction, amount: int):
 
 
 @bot.tree.command(name="time-to-next-reset", description="Shows the time remaining until the next weekly RP reset.")
+@log_function_call
 async def time_to_next_reset(interaction: discord.Interaction):
     seconds_remaining = seconds_until_next_monday_midnight_utc()
     time_remaining = datetime.timedelta(seconds=int(seconds_remaining))
@@ -294,6 +324,7 @@ async def time_to_next_reset(interaction: discord.Interaction):
     await interaction.response.send_message(embed=embed)
 
 @bot.tree.command(name="uptime", description="Shows how long the bot has been running.")
+@log_function_call
 async def uptime(interaction: discord.Interaction):
     uptime_duration = datetime.datetime.utcnow() - start_time
 
@@ -312,6 +343,7 @@ async def uptime(interaction: discord.Interaction):
     discord.app_commands.Choice(name="Remove", value="remove"),
     discord.app_commands.Choice(name="Set", value="set")
 ])
+@log_function_call
 async def admin_rp(interaction: discord.Interaction, user: discord.Member, amount: int, action: str):
     if interaction.user.id not in WHITELISTED_USERS:
         embed = discord.Embed(
@@ -353,6 +385,7 @@ async def admin_rp(interaction: discord.Interaction, user: discord.Member, amoun
     await interaction.response.send_message(embed=embed)
 
 @bot.tree.command(name="ping", description="Tests the bot's response time")
+@log_function_call
 async def ping(interaction: discord.Interaction):
     embed = discord.Embed(
         title="Pong!",
@@ -364,6 +397,7 @@ async def ping(interaction: discord.Interaction):
 
 # add eval command for db
 @bot.tree.command(name="eval-sql", description="Execute raw SQL commands. (Whitelisted users only)")
+@log_function_call
 async def eval_sql(interaction: discord.Interaction, query: str):
     if interaction.user.id not in WHITELISTED_USERS:
         embed = discord.Embed(
@@ -391,6 +425,18 @@ async def eval_sql(interaction: discord.Interaction, query: str):
     )
     await interaction.response.send_message(embed=embed)
 
+# Global error handler
+@bot.event
+async def on_command_error(ctx, error):
+    error_message = f"Error in command `{ctx.command}`: {str(error)}"
+    log_to_webhook(error_message)
+    traceback.print_exc()
+
+@bot.event
+async def on_error(event_method, *args, **kwargs):
+    error_message = f"Error in event `{event_method}`: {traceback.format_exc()}"
+    log_to_webhook(error_message)
+    traceback.print_exc()
 
 # Read the token from a file named "token".
 with open("token", "r") as token_file:
