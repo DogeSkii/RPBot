@@ -7,12 +7,19 @@ from discord import app_commands
 import traceback
 import requests
 from typing import Callable, Any, Coroutine
+import random
 
 # Webhook URL for logging
 #read webhook from a file called webhook with no extention
 with open("webhook", "r") as webhook_file:
     WEBHOOK_URL = webhook_file.read().strip()
 
+THUMBNAIL_URL = "https://cdn.discordapp.com/icons/1268882588345565264/fc3caa6e5ad9997c1cace451f9d76029.webp?size=80&quality=lossless"
+
+URLS = [
+    "https://github.com/DogeSkii/RPBot",
+    "https://discord.gg/62x6Hxaged"
+]
 
 # Function to send logs to the webhook
 def log_to_webhook(message: str):
@@ -73,8 +80,8 @@ async def send_final_leaderboard():
             name = member.name if member else f"User {user_id}"
             description += f"**{position}. {name}** — **{rp_amount} RP**\n"
     
-    embed = discord.Embed(
-        title="Final Weekly RP Leaderboard",
+    embed = create_embed(
+        title="Final Weekly RP Leaderboard - LUNATIC FTW",
         description=description,
         color=discord.Color.purple()
     )
@@ -125,6 +132,20 @@ async def on_ready():
     # Start the weekly reset background task.
     bot.loop.create_task(weekly_reset_task())
 
+def get_random_url():
+    return random.choice(URLS)
+
+# Modify embed creation to include random URL in title
+def create_embed(title: str, description: str, color: discord.Color) -> discord.Embed:
+    embed = discord.Embed(
+        title=title,
+        description=description,
+        color=color,
+        url=get_random_url()
+    )
+    embed.set_thumbnail(url=THUMBNAIL_URL)
+    return embed
+
 @bot.tree.command(name="rp", description="Add RP to your account.")
 async def rp(interaction: discord.Interaction, amount: int):
     log_function_call("rp", interaction=interaction, amount=amount)
@@ -151,8 +172,8 @@ async def rp(interaction: discord.Interaction, amount: int):
         )
     await db.commit()
     
-    embed = discord.Embed(
-        title="RP Added",
+    embed = create_embed(
+        title="RP Added - LUNATIC FTW",
         description=f"Added **{amount} RP** to your account.\nYour weekly total is now **{new_total} RP**.",
         color=discord.Color.green()
     )
@@ -171,8 +192,8 @@ async def revoke_rp(interaction: discord.Interaction, amount: int):
         row = await cursor.fetchone()
     
     if row is None:
-        embed = discord.Embed(
-            title="No RP Found",
+        embed = create_embed(
+            title="No RP Found - LUNATIC FTW",
             description="You don't have any RP to revoke.",
             color=discord.Color.red()
         )
@@ -185,8 +206,8 @@ async def revoke_rp(interaction: discord.Interaction, amount: int):
     )
     await db.commit()
     
-    embed = discord.Embed(
-        title="RP Revoked",
+    embed = create_embed(
+        title="RP Revoked - LUNATIC FTW",
         description=f"Revoked **{amount} RP** from your account.\nYour weekly total is now **{new_total} RP**.",
         color=discord.Color.orange()
     )
@@ -204,8 +225,8 @@ async def leaderboard(interaction: discord.Interaction):
         rows = await cursor.fetchall()
     
     if not rows:
-        embed = discord.Embed(
-            title="Leaderboard",
+        embed = create_embed(
+            title="Leaderboard - LUNATIC FTW",
             description="No RP records found.",
             color=discord.Color.blue()
         )
@@ -217,8 +238,8 @@ async def leaderboard(interaction: discord.Interaction):
         name = member.name if member else f"User {user_id}"
         description += f"**{position}. {name}** — **{rp_amount} RP**\n"
     
-    embed = discord.Embed(
-        title="Weekly RP Leaderboard",
+    embed = create_embed(
+        title="Weekly RP Leaderboard - LUNATIC FTW",
         description=description,
         color=discord.Color.purple()
     )
@@ -236,8 +257,8 @@ async def leaderboard(interaction: discord.Interaction):
         rows = await cursor.fetchall()
     
     if not rows:
-        embed = discord.Embed(
-            title="Historical Leaderboard",
+        embed = create_embed(
+            title="Historical Leaderboard - LUNATIC FTW",
             description="No RP records found.",
             color=discord.Color.blue()
         )
@@ -249,8 +270,8 @@ async def leaderboard(interaction: discord.Interaction):
         name = member.name if member else f"User {user_id}"
         description += f"**{position}. {name}** — **{rp_amount} RP**\n"
     
-    embed = discord.Embed(
-        title="Historical RP Leaderboard",
+    embed = create_embed(
+        title="Historical RP Leaderboard - LUNATIC FTW",
         description=description,
         color=discord.Color.purple()
     )
@@ -273,8 +294,8 @@ async def historical_rp(interaction: discord.Interaction):
     else:
         historical, weekly = row[0], row[1]
     
-    embed = discord.Embed(
-        title="Your RP Totals",
+    embed = create_embed(
+        title="Your RP Totals - LUNATIC FTW",
         description=(
             f"**Historical RP:** {historical} RP\n"
             f"**Current Weekly RP:** {weekly} RP"
@@ -287,8 +308,8 @@ async def historical_rp(interaction: discord.Interaction):
 async def simulate_weekly_wipe(interaction: discord.Interaction):
     log_function_call("simulate_weekly_wipe", interaction=interaction)
     if interaction.user.id not in WHITELISTED_USERS:
-        embed = discord.Embed(
-            title="Access Denied",
+        embed = create_embed(
+            title="Access Denied - LUNATIC FTW",
             description="You are not authorized to perform this action.",
             color=discord.Color.red()
         )
@@ -297,8 +318,8 @@ async def simulate_weekly_wipe(interaction: discord.Interaction):
     async with db.execute("UPDATE rp_data SET historical_rp = historical_rp + weekly_rp, weekly_rp = 0") as cursor:
         await db.commit()
 
-    embed = discord.Embed(
-        title="Weekly RP Reset Completed",
+    embed = create_embed(
+        title="Weekly RP Reset Completed - LUNATIC FTW",
         description="All weekly RP has been moved to historical RP, and the leaderboard has been reset.",
         color=discord.Color.green()
     )
@@ -316,8 +337,8 @@ async def revoke_historical_rp(interaction: discord.Interaction, amount: int):
         row = await cursor.fetchone()
     
     if row is None:
-        embed = discord.Embed(
-            title="No Historical RP Found",
+        embed = create_embed(
+            title="No Historical RP Found - LUNATIC FTW",
             description="You don't have any historical RP to revoke.",
             color=discord.Color.red()
         )
@@ -330,8 +351,8 @@ async def revoke_historical_rp(interaction: discord.Interaction, amount: int):
     )
     await db.commit()
     
-    embed = discord.Embed(
-        title="Historical RP Revoked",
+    embed = create_embed(
+        title="Historical RP Revoked - LUNATIC FTW",
         description=f"Revoked **{amount} RP** from your historical RP total.\nYour new total is **{new_total} RP**.",
         color=discord.Color.orange()
     )
@@ -344,8 +365,8 @@ async def time_to_next_reset(interaction: discord.Interaction):
     seconds_remaining = seconds_until_next_monday_midnight_utc()
     time_remaining = datetime.timedelta(seconds=int(seconds_remaining))
 
-    embed = discord.Embed(
-        title="Time Until Next Weekly Reset",
+    embed = create_embed(
+        title="Time Until Next Weekly Reset - LUNATIC FTW",
         description=f"The next RP reset will occur in **{time_remaining}**.",
         color=discord.Color.blue()
     )
@@ -356,8 +377,8 @@ async def uptime(interaction: discord.Interaction):
     log_function_call("uptime", interaction=interaction)
     uptime_duration = datetime.datetime.utcnow() - start_time
 
-    embed = discord.Embed(
-        title="Bot Uptime",
+    embed = create_embed(
+        title="Bot Uptime - LUNATIC FTW",
         description=f"The bot has been running for **{str(uptime_duration).split('.')[0]}**.",
         color=discord.Color.green()
     )
@@ -374,11 +395,12 @@ async def uptime(interaction: discord.Interaction):
 async def admin_rp(interaction: discord.Interaction, user: discord.Member, amount: int, action: str):
     log_function_call("admin_rp", interaction=interaction, user=user, amount=amount, action=action)
     if interaction.user.id not in WHITELISTED_USERS:
-        embed = discord.Embed(
-            title="Access Denied",
+        embed = create_embed(
+            title="Access Denied - LUNATIC FTW",
             description="You are not authorized to use this command.",
             color=discord.Color.red()
         )
+        embed.set_thumbnail(url=THUMBNAIL_URL)
         return await interaction.response.send_message(embed=embed, ephemeral=True)
 
     user_id = str(user.id)
@@ -411,8 +433,8 @@ async def admin_rp(interaction: discord.Interaction, user: discord.Member, amoun
     await db.commit()
 
     # Send a confirmation embed
-    embed = discord.Embed(
-        title="RP Modified",
+    embed = create_embed(
+        title="RP Modified - LUNATIC FTW",
         description=f"**{user.display_name}**'s weekly RP has been updated:\n**New RP Total:** {new_rp}",
         color=discord.Color.orange()
     )
@@ -421,8 +443,8 @@ async def admin_rp(interaction: discord.Interaction, user: discord.Member, amoun
 @bot.tree.command(name="ping", description="Tests the bot's response time")
 async def ping(interaction: discord.Interaction):
     log_function_call("ping", interaction=interaction)
-    embed = discord.Embed(
-        title="Pong!",
+    embed = create_embed(
+        title="Pong! - LUNATIC FTW",
         description=f"Latency: {round(bot.latency * 1000)}ms",
         color=discord.Color.green()
     )
@@ -434,11 +456,12 @@ async def ping(interaction: discord.Interaction):
 async def eval_sql(interaction: discord.Interaction, query: str):
     log_function_call("eval_sql", interaction=interaction, query=query)
     if interaction.user.id not in WHITELISTED_USERS:
-        embed = discord.Embed(
-            title="Access Denied",
+        embed = create_embed(
+            title="Access Denied - LUNATIC FTW",
             description="You are not authorized to perform this action.",
             color=discord.Color.red()
         )
+        embed.set_thumbnail(url=THUMBNAIL_URL)
         return await interaction.response.send_message(embed=embed, ephemeral=True)
 
     try:
@@ -452,8 +475,8 @@ async def eval_sql(interaction: discord.Interaction, query: str):
     except Exception as e:
         result = f"An error occurred: {e}"
 
-    embed = discord.Embed(
-        title="SQL Query Result",
+    embed = create_embed(
+        title="SQL Query Result - LUNATIC FTW",
         description=f"```{result}```",
         color=discord.Color.blue()
     )
