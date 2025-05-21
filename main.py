@@ -41,26 +41,17 @@ async def initialize_database():
     global db
     db = await aiosqlite.connect(DATABASE)
     
-    # Create the table if it doesn't exist (initially with only user_id).
+    # Create the table with server_id and user_id as composite primary key
     await db.execute("""
         CREATE TABLE IF NOT EXISTS rp_data (
-            user_id TEXT PRIMARY KEY
+            server_id TEXT,
+            user_id TEXT,
+            weekly_rp INTEGER DEFAULT 0,
+            historical_rp INTEGER DEFAULT 0,
+            PRIMARY KEY (server_id, user_id)
         )
     """)
     await db.commit()
-
-    # Check existing columns and add missing ones.
-    async with db.execute("PRAGMA table_info(rp_data)") as cursor:
-        columns = await cursor.fetchall()
-    existing_columns = {col[1] for col in columns}
-    
-    if "weekly_rp" not in existing_columns:
-        await db.execute("ALTER TABLE rp_data ADD COLUMN weekly_rp INTEGER DEFAULT 0")
-    if "historical_rp" not in existing_columns:
-        await db.execute("ALTER TABLE rp_data ADD COLUMN historical_rp INTEGER DEFAULT 0")
-    await db.commit()
-
-
 
 async def send_final_leaderboard():
     channel_id = 123456789012345678  # Replace with your channel ID
@@ -138,15 +129,26 @@ async def on_ready():
 async def rp(interaction: discord.Interaction, amount: int):
     log_function_call("rp", interaction=interaction, amount=amount)
     user_id = str(interaction.user.id)
-    async with db.execute("SELECT weekly_rp FROM rp_data WHERE user_id = ?", (user_id,)) as cursor:
+    server_id = str(interaction.guild.id)
+    
+    async with db.execute(
+        "SELECT weekly_rp FROM rp_data WHERE server_id = ? AND user_id = ?",
+        (server_id, user_id)
+    ) as cursor:
         row = await cursor.fetchone()
     
     if row is None:
+        await db.execute(
+            "INSERT INTO rp_data (server_id, user_id, weekly_rp) VALUES (?, ?, ?)",
+            (server_id, user_id, amount)
+        )
         new_total = amount
-        await db.execute("INSERT INTO rp_data (user_id, weekly_rp) VALUES (?, ?)", (user_id, new_total))
     else:
         new_total = row[0] + amount
-        await db.execute("UPDATE rp_data SET weekly_rp = ? WHERE user_id = ?", (new_total, user_id))
+        await db.execute(
+            "UPDATE rp_data SET weekly_rp = ? WHERE server_id = ? AND user_id = ?",
+            (new_total, server_id, user_id)
+        )
     await db.commit()
     
     embed = discord.Embed(
@@ -160,7 +162,12 @@ async def rp(interaction: discord.Interaction, amount: int):
 async def revoke_rp(interaction: discord.Interaction, amount: int):
     log_function_call("revoke_rp", interaction=interaction, amount=amount)
     user_id = str(interaction.user.id)
-    async with db.execute("SELECT weekly_rp FROM rp_data WHERE user_id = ?", (user_id,)) as cursor:
+    server_id = str(interaction.guild.id)
+    
+    async with db.execute(
+        "SELECT weekly_rp FROM rp_data WHERE server_id = ? AND user_id = ?",
+        (server_id, user_id)
+    ) as cursor:
         row = await cursor.fetchone()
     
     if row is None:
@@ -172,7 +179,10 @@ async def revoke_rp(interaction: discord.Interaction, amount: int):
         return await interaction.response.send_message(embed=embed)
     
     new_total = max(row[0] - amount, 0)
-    await db.execute("UPDATE rp_data SET weekly_rp = ? WHERE user_id = ?", (new_total, user_id))
+    await db.execute(
+        "UPDATE rp_data SET weekly_rp = ? WHERE server_id = ? AND user_id = ?",
+        (new_total, server_id, user_id)
+    )
     await db.commit()
     
     embed = discord.Embed(
@@ -185,8 +195,12 @@ async def revoke_rp(interaction: discord.Interaction, amount: int):
 @bot.tree.command(name="leaderboard", description="Show the weekly RP leaderboard.")
 async def leaderboard(interaction: discord.Interaction):
     log_function_call("leaderboard", interaction=interaction)
+    server_id = str(interaction.guild.id)
     # Exclude users with 0 weekly RP.
-    async with db.execute("SELECT user_id, weekly_rp FROM rp_data WHERE weekly_rp > 0 ORDER BY weekly_rp DESC LIMIT 10") as cursor:
+    async with db.execute(
+        "SELECT user_id, weekly_rp FROM rp_data WHERE server_id = ? AND weekly_rp > 0 ORDER BY weekly_rp DESC LIMIT 10",
+        (server_id,)
+    ) as cursor:
         rows = await cursor.fetchall()
     
     if not rows:
@@ -213,8 +227,12 @@ async def leaderboard(interaction: discord.Interaction):
 @bot.tree.command(name="historical-leaderboard", description="Show the historical RP leaderboard.")
 async def leaderboard(interaction: discord.Interaction):
     log_function_call("historical_leaderboard", interaction=interaction)
+    server_id = str(interaction.guild.id)
     # Exclude users with 0 weekly RP.
-    async with db.execute("SELECT user_id, historical_rp FROM rp_data WHERE historical_rp > 0 ORDER BY historical_rp DESC LIMIT 10") as cursor:
+    async with db.execute(
+        "SELECT user_id, historical_rp FROM rp_data WHERE server_id = ? AND historical_rp > 0 ORDER BY historical_rp DESC LIMIT 10",
+        (server_id,)
+    ) as cursor:
         rows = await cursor.fetchall()
     
     if not rows:
@@ -243,7 +261,11 @@ async def leaderboard(interaction: discord.Interaction):
 async def historical_rp(interaction: discord.Interaction):
     log_function_call("historical_rp", interaction=interaction)
     user_id = str(interaction.user.id)
-    async with db.execute("SELECT historical_rp, weekly_rp FROM rp_data WHERE user_id = ?", (user_id,)) as cursor:
+    server_id = str(interaction.guild.id)
+    async with db.execute(
+        "SELECT historical_rp, weekly_rp FROM rp_data WHERE server_id = ? AND user_id = ?",
+        (server_id, user_id)
+    ) as cursor:
         row = await cursor.fetchone()
     
     if row is None:
@@ -286,7 +308,11 @@ async def simulate_weekly_wipe(interaction: discord.Interaction):
 async def revoke_historical_rp(interaction: discord.Interaction, amount: int):
     log_function_call("revoke_historical_rp", interaction=interaction, amount=amount)
     user_id = str(interaction.user.id)
-    async with db.execute("SELECT historical_rp FROM rp_data WHERE user_id = ?", (user_id,)) as cursor:
+    server_id = str(interaction.guild.id)
+    async with db.execute(
+        "SELECT historical_rp FROM rp_data WHERE server_id = ? AND user_id = ?",
+        (server_id, user_id)
+    ) as cursor:
         row = await cursor.fetchone()
     
     if row is None:
@@ -298,7 +324,10 @@ async def revoke_historical_rp(interaction: discord.Interaction, amount: int):
         return await interaction.response.send_message(embed=embed)
     
     new_total = max(row[0] - amount, 0)
-    await db.execute("UPDATE rp_data SET historical_rp = ? WHERE user_id = ?", (new_total, user_id))
+    await db.execute(
+        "UPDATE rp_data SET historical_rp = ? WHERE server_id = ? AND user_id = ?",
+        (new_total, server_id, user_id)
+    )
     await db.commit()
     
     embed = discord.Embed(
@@ -353,9 +382,13 @@ async def admin_rp(interaction: discord.Interaction, user: discord.Member, amoun
         return await interaction.response.send_message(embed=embed, ephemeral=True)
 
     user_id = str(user.id)
+    server_id = str(interaction.guild.id)
 
     # Fetch the current RP
-    async with db.execute("SELECT weekly_rp FROM rp_data WHERE user_id = ?", (user_id,)) as cursor:
+    async with db.execute(
+        "SELECT weekly_rp FROM rp_data WHERE server_id = ? AND user_id = ?",
+        (server_id, user_id)
+    ) as cursor:
         row = await cursor.fetchone()
     
     current_rp = row[0] if row else 0
@@ -371,8 +404,10 @@ async def admin_rp(interaction: discord.Interaction, user: discord.Member, amoun
         return await interaction.response.send_message("Invalid action.", ephemeral=True)
 
     # Update the database
-    await db.execute("INSERT INTO rp_data (user_id, weekly_rp) VALUES (?, ?) ON CONFLICT(user_id) DO UPDATE SET weekly_rp = ?", 
-                     (user_id, new_rp, new_rp))
+    await db.execute(
+        "INSERT INTO rp_data (server_id, user_id, weekly_rp) VALUES (?, ?, ?) ON CONFLICT(server_id, user_id) DO UPDATE SET weekly_rp = ?", 
+        (server_id, user_id, new_rp, new_rp)
+    )
     await db.commit()
 
     # Send a confirmation embed
