@@ -63,12 +63,16 @@ async def initialize_database():
 async def send_final_leaderboard():
     channel_id = 123456789012345678  # Replace with your channel ID
     channel = bot.get_channel(channel_id)
+    server_id = "1327368402855268402"  # Replace with your specific server ID
     
     if channel is None:
         print(f"Channel with ID {channel_id} not found.")
         return
 
-    async with db.execute("SELECT user_id, weekly_rp FROM rp_data WHERE weekly_rp > 0 ORDER BY weekly_rp DESC LIMIT 10") as cursor:
+    async with db.execute(
+        "SELECT user_id, weekly_rp FROM rp_data WHERE server_id = ? AND weekly_rp > 0 ORDER BY weekly_rp DESC LIMIT 10",
+        (server_id,)
+    ) as cursor:
         rows = await cursor.fetchall()
     
     if not rows:
